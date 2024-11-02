@@ -8,11 +8,6 @@ from modelscope import snapshot_download
 import numpy as np
 import time
 
-DEVICE = "cuda"
-DEVICE_ID = "0"
-CUDA_DEVICE = f"{DEVICE}:{DEVICE_ID}" if DEVICE_ID else DEVICE
-
-
 def torch_gc():
     if torch.cuda.is_available():
         with torch.cuda.device(CUDA_DEVICE):
@@ -110,7 +105,7 @@ if __name__ == '__main__':
     #text = predict(model, processor, image, "描述图像内容, 图像中的驾驶员有没有专注驾驶， 有没有目视前方？")
     #print(text)
 
-    uvicorn.run(app, host='0.0.0.0', port=8080, workers=1)
+    uvicorn.run(app, host='0.0.0.0', port=50002, workers=1)
 
    
 
