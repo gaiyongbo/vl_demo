@@ -2,8 +2,8 @@ from fastapi import FastAPI, Request
 from transformers import AutoTokenizer, AutoModel
 import uvicorn, json, datetime
 import torch
-from transformers import Qwen2VLForConditionalGeneration, AutoTokenizer, AutoProcessor
-from qwen_vl_utils import process_vision_info
+from transformers import Qwen2VLForConditionalGeneration, AutoTokenizer, Qwen2VLProcessor
+from vison_process import process_vision_info
 from modelscope import snapshot_download
 import numpy as np
 import time
@@ -27,15 +27,20 @@ async def create_item(request: Request):
     prompt = json_post_raw["prompt"]
 
     image_tokens = json_post_raw["tokens"]
+    image_grid_thw = json_post_raw["image_grid_thw"]
 
     image_tokens = np.array(image_tokens)
+    image_grid_thw = np.array(image_grid_thw)
 
     print(f"\nServer get prompt: '{prompt}'\n")
     time.sleep(1)
     print(f"\nServer get image tokens with size  {image_tokens.shape}, and the value is {image_tokens}...\n")
     time.sleep(1)
     print(f"\nStart to generate text response ....\n")
-    text = predict(model, processor, "/mnt/workspace/yongbo/yongbin/demo.jpg",prompt)
+
+    image_embedding = torch.from_numpy(image_tokens).to('cuda')
+    image_grid_thw = torch.from_numpy(image_grid_thw).to('cuda')
+    text = predict(model, processor, "/mnt/workspace/vl_demo/demo.jpg",prompt,image_embedding,image_grid_thw)
     print(f"\nServer response {text}\n")
 
     now = datetime.datetime.now()
@@ -48,7 +53,7 @@ async def create_item(request: Request):
     return answer
 
 
-def predict(model,processor, image, prompt):
+def predict(model,processor, image, prompt,image_embedding,image_grid_thw):
 
 
     messages = [
@@ -73,9 +78,12 @@ def predict(model,processor, image, prompt):
         text=[text],
         images=image_inputs,
         videos=video_inputs,
+        image_embedding=image_embedding,
         padding=True,
         return_tensors="pt",
     )
+    inputs['image_grid_thw'] = image_grid_thw
+    #inputs['pixel_values'] = None
     inputs = inputs.to("cuda")
 
 
@@ -94,18 +102,22 @@ if __name__ == '__main__':
   
     model_dir = snapshot_download("qwen/Qwen2-VL-2B-Instruct")
 
+    print(f"download model into :{model_dir}")
+
     # default: Load the model on the available device(s)
     model = Qwen2VLForConditionalGeneration.from_pretrained(
-        model_dir, torch_dtype="auto", device_map="auto"
+        model_dir, torch_dtype="auto", device_map="cuda"
     )
-    processor = AutoProcessor.from_pretrained(model_dir)
+
+    print(f"model loaded!")
+    processor = Qwen2VLProcessor.from_pretrained(model_dir)
 
     #test
     #image = "/mnt/workspace/yongbo/yongbin/demo.jpg"
     #text = predict(model, processor, image, "描述图像内容, 图像中的驾驶员有没有专注驾驶， 有没有目视前方？")
     #print(text)
 
-    uvicorn.run(app, host='0.0.0.0', port=50002, workers=1)
+    uvicorn.run(app, host='0.0.0.0', port=8080, workers=1)
 
    
 
